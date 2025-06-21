@@ -4,13 +4,15 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const { v4: uuidv4 } = require('uuid');
+const jwt = require('jsonwebtoken'); 
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware setup
-app.use(bodyParser.json());
+app.use(express.json());
+app.use(loggerMiddleware);
 
 // Sample in-memory products database
 let products = [
@@ -58,9 +60,36 @@ app.get('/api/products', (req, res) => {
 });
 
 // TODO: Implement custom middleware for:
-// - Request logging
+
+// - Request logging  --  Custom logger middleware
+const loggerMiddleware = (req, res, next) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${req.method} ${req.url}`);
+  next(); // Pass control to the next middleware/route
+};
+
 // - Authentication
+const auth = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token || token !== 'valid-token') {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.apiKey);
+    req.user = decoded; // Attach user info to request object
+  next(); // Pass control to the next middleware/route
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid token' });
+  }
+}
+
+
 // - Error handling
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
+});
+
 
 // Start the server
 app.listen(PORT, () => {
